@@ -21,7 +21,7 @@ import com.gihansgamage.coinspot.data.local.database.entities.UserProfile
         DailySaving::class,
         Badge::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false  // Set to false to avoid schema export warning
 )
 @TypeConverters(DateConverter::class, EnumConverters::class)
