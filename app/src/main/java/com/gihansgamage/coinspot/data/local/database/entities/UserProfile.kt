@@ -2,22 +2,20 @@ package com.gihansgamage.coinspot.data.local.database.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import java.util.Date
 
 @Entity(tableName = "user_profile")
 data class UserProfile(
-    @PrimaryKey(autoGenerate = true)
-    val id: Int = 0,
-    val age: Int,
-    val monthlyIncome: Double,
-    val livingCosts: Double,
-    val foodExpenses: Double,
-    val otherCosts: Double,
-    val currency: String,
+    @PrimaryKey
+    val id: Int = 1, // Single user profile
+    val name: String,
     val country: String,
-    val savingStyle: String, // "conservative", "balanced", "aggressive"
-    val dailySavingAmount: Double,
-    val disposableIncome: Double,
-    val createdAt: Date = Date(),
-    val lastUpdated: Date = Date()
-)
+    val currency: String,
+    val currencySymbol: String,
+    val monthlyIncome: Double = 0.0,
+    val monthlyExpenses: Double = 0.0,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+) {
+    val disposableIncome: Double
+        get() = (monthlyIncome - monthlyExpenses).coerceAtLeast(0.0)
+}

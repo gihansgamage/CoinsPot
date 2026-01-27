@@ -5,9 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,12 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.gihansgamage.coinspot.presentation.components.common.LoadingIndicator
-import com.gihansgamage.coinspot.presentation.components.navigation.BottomNavigationBar
-import com.gihansgamage.coinspot.presentation.components.navigation.NavItem
 import com.gihansgamage.coinspot.presentation.screen.home.components.GoalCard
-import com.gihansgamage.coinspot.presentation.screen.home.components.ProgressChart
+import com.gihansgamage.coinspot.presentation.screen.home.components.StatCard
 import com.gihansgamage.coinspot.presentation.viewmodel.HomeViewModel
+import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,30 +29,45 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    // Collect states from ViewModel
+    val userName by viewModel.userName.collectAsState()
+    val currencySymbol by viewModel.currencySymbol.collectAsState()
+    val activeGoals by viewModel.activeGoals.collectAsState()
+    val totalSavings by viewModel.totalSavings.collectAsState()
+    val totalRemaining by viewModel.totalRemaining.collectAsState()
+    val completedGoalsCount by viewModel.completedGoalsCount.collectAsState()
+
+    // Get greeting based on time
+    val greeting = remember {
+        when (LocalTime.now().hour) {
+            in 0..11 -> "Good Morning"
+            in 12..16 -> "Good Afternoon"
+            else -> "Good Evening"
+        }
+    }
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
+            TopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column {
                         Text(
-                            "CoinsPot",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = greeting,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = userName.ifEmpty { "Welcome" },
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                        if (uiState.greeting.isNotEmpty()) {
-                            Text(
-                                uiState.greeting,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings"
+                        )
                     }
                 }
             )
@@ -65,172 +77,195 @@ fun HomeScreen(
                 onClick = onNavigateToCreateGoal,
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Goal")
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Create Goal"
+                )
             }
-        },
-        bottomBar = {
-            BottomNavigationBar(
-                items = listOf(
-                    NavItem(
-                        icon = Icons.Default.Wallet,
-                        label = "Home",
-                        route = "home"
-                    ),
-                    NavItem(
-                        icon = Icons.Default.Wallet,
-                        label = "Daily",
-                        route = "daily"
-                    ),
-                    NavItem(
-                        icon = Icons.Default.Insights,
-                        label = "Insights",
-                        route = "insights"
-                    )
-                ),
-                currentRoute = "home",
-                onItemClick = { route ->
-                    when (route) {
-                        "daily" -> onNavigateToDailySaving()
-                        "insights" -> onNavigateToInsights()
-                    }
-                }
-            )
         }
     ) { paddingValues ->
-        if (uiState.isLoading) {
-            LoadingIndicator()
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(16.dp)
-            ) {
-                item {
-                    // Stats Overview
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Stats Section
+            item {
+                Text(
+                    text = "Your Savings Overview",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        title = "Total Saved",
+                        value = "$currencySymbol${String.format("%.2f", totalSavings)}",
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    StatCard(
+                        title = "Active Goals",
+                        value = "${activeGoals.size}",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        title = "Remaining",
+                        value = "$currencySymbol${String.format("%.2f", totalRemaining)}",
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    StatCard(
+                        title = "Completed",
+                        value = "$completedGoalsCount",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // Quick Actions
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Quick Actions",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onNavigateToDailySaving,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        StatCard(
-                            title = "Active Goals",
-                            value = uiState.totalActiveGoals.toString(),
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatCard(
-                            title = "Total Saved",
-                            value = "${uiState.currencySymbol}${String.format("%.2f", uiState.totalSavedAmount)}",
-                            modifier = Modifier.weight(1f)
-                        )
+                        Text("Daily Saving")
+                    }
+
+                    OutlinedButton(
+                        onClick = onNavigateToInsights,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Insights")
                     }
                 }
+            }
 
-                item {
-                    // Monthly Progress
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = "Monthly Progress",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            ProgressChart(
-                                planned = uiState.totalSavingsThisMonth,
-                                actual = uiState.totalSavingsThisMonth * 0.8, // Example
-                                modifier = Modifier.height(150.dp)
-                            )
+            // Active Goals Section
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Active Goals",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    if (activeGoals.isNotEmpty()) {
+                        TextButton(onClick = { /* TODO: Navigate to all goals */ }) {
+                            Text("See All")
                         }
                     }
                 }
+            }
 
+            if (activeGoals.isEmpty()) {
                 item {
-                    Text(
-                        text = "Active Goals",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                    EmptyGoalsPlaceholder(
+                        onCreateGoal = onNavigateToCreateGoal
                     )
                 }
-
-                if (uiState.activeGoals.isEmpty()) {
-                    item {
-                        EmptyState(
-                            onAddGoal = onNavigateToCreateGoal
-                        )
-                    }
-                } else {
-                    items(uiState.activeGoals) { goal ->
-                        GoalCard(
-                            goal = goal,
-                            onClick = { onNavigateToGoalDetail(goal.id) }
-                        )
-                    }
+            } else {
+                items(activeGoals) { goal ->
+                    GoalCard(
+                        goal = goal,
+                        onClick = { onNavigateToGoalDetail(goal.id) }
+                    )
                 }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
             }
         }
     }
 }
 
 @Composable
-fun StatCard(
-    title: String,
-    value: String,
+fun EmptyGoalsPlaceholder(
+    onCreateGoal: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(modifier = modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                text = "🎯",
+                style = MaterialTheme.typography.displayLarge
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
+                text = "No Active Goals Yet",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Start your savings journey by creating your first goal!",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
 
-@Composable
-fun EmptyState(
-    onAddGoal: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "No Goals Yet",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Create your first saving goal to get started",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onAddGoal) {
-            Text("Create First Goal")
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(onClick = onCreateGoal) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Create Your First Goal")
+            }
         }
     }
 }

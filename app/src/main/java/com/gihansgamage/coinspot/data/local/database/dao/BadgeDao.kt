@@ -2,37 +2,30 @@ package com.gihansgamage.coinspot.data.local.database.dao
 
 import androidx.room.*
 import com.gihansgamage.coinspot.data.local.database.entities.Badge
+import com.gihansgamage.coinspot.data.local.database.entities.BadgeCategory
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BadgeDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(badge: Badge): Long
 
-    @Update
-    suspend fun update(badge: Badge)
+    @Query("SELECT * FROM badges ORDER BY earnedDate DESC")
+    fun getAllBadges(): Flow<List<Badge>>
+
+    @Query("SELECT * FROM badges WHERE category = :category ORDER BY earnedDate DESC")
+    fun getBadgesByCategory(category: BadgeCategory): Flow<List<Badge>>
+
+    @Query("SELECT * FROM badges WHERE id = :badgeId")
+    fun getBadgeById(badgeId: Int): Flow<Badge?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBadge(badge: Badge): Long
 
     @Delete
-    suspend fun delete(badge: Badge)
+    suspend fun deleteBadge(badge: Badge)
 
-    @Query("SELECT * FROM badge WHERE userId = :userId ORDER BY achievedAt DESC")
-    fun getBadgesByUser(userId: Int): Flow<List<Badge>>
+    @Query("SELECT COUNT(*) FROM badges")
+    fun getBadgesCount(): Flow<Int>
 
-    @Query("SELECT * FROM badge WHERE userId = :userId AND isUnlocked = 1 ORDER BY achievedAt DESC")
-    fun getUnlockedBadges(userId: Int): Flow<List<Badge>>
-
-    @Query("SELECT * FROM badge WHERE userId = :userId AND isUnlocked = 0")
-    fun getLockedBadges(userId: Int): Flow<List<Badge>>
-
-    @Query("SELECT * FROM badge WHERE userId = :userId AND badgeType = :badgeType")
-    suspend fun getBadgeByType(userId: Int, badgeType: String): Badge?
-
-    @Query("UPDATE badge SET isUnlocked = 1 WHERE id = :badgeId")
-    suspend fun unlockBadge(badgeId: Int)
-
-    @Query("SELECT COUNT(*) FROM badge WHERE userId = :userId AND isUnlocked = 1")
-    fun getUnlockedBadgeCount(userId: Int): Flow<Int>
-
-    @Query("DELETE FROM badge WHERE userId = :userId")
-    suspend fun deleteAllForUser(userId: Int)
+    @Query("SELECT COUNT(*) FROM badges WHERE category = :category")
+    fun getBadgesCountByCategory(category: BadgeCategory): Flow<Int>
 }

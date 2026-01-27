@@ -2,6 +2,7 @@ package com.gihansgamage.coinspot.presentation.screen.onboarding
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,389 +13,398 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gihansgamage.coinspot.data.model.Country
-import com.gihansgamage.coinspot.data.model.CountryData
-import com.gihansgamage.coinspot.presentation.components.common.AppTextField
-import com.gihansgamage.coinspot.presentation.screen.onboarding.components.OnboardingStep
 import com.gihansgamage.coinspot.presentation.viewmodel.OnboardingViewModel
+import com.gihansgamage.coinspot.presentation.viewmodel.OnboardingUiState
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var currentStep by remember { mutableStateOf(0) }
+    var name by remember { mutableStateOf("") }
+    var selectedCountry by remember { mutableStateOf<Country?>(null) }
+    var monthlyIncome by remember { mutableStateOf("") }
+    var monthlyExpenses by remember { mutableStateOf("") }
 
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Handle UI state
+    LaunchedEffect(uiState) {
+        when (val state = uiState) {
+            is OnboardingUiState.Success -> {
+                onComplete()
+            }
+            is OnboardingUiState.Error -> {
+                scope.launch {
+                    snackbarHostState.showSnackbar(state.message)
+                }
+                viewModel.clearUiState()
+            }
+            else -> {}
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Progress indicator
+            LinearProgressIndicator(
+                progress = (currentStep + 1) / 3f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            when (currentStep) {
+                0 -> WelcomeStep(
+                    name = name,
+                    onNameChange = { name = it },
+                    onNext = {
+                        if (name.isNotEmpty()) currentStep++
+                    }
+                )
+
+                1 -> CountryStep(
+                    selectedCountry = selectedCountry,
+                    onCountrySelected = { selectedCountry = it },
+                    onNext = {
+                        if (selectedCountry != null) currentStep++
+                    },
+                    onBack = { currentStep-- }
+                )
+
+                2 -> FinancialStep(
+                    monthlyIncome = monthlyIncome,
+                    onIncomeChange = { monthlyIncome = it },
+                    monthlyExpenses = monthlyExpenses,
+                    onExpensesChange = { monthlyExpenses = it },
+                    onComplete = {
+                        selectedCountry?.let { country ->
+                            viewModel.completeOnboarding(
+                                name = name,
+                                country = country.name,
+                                currency = country.currency,
+                                currencySymbol = country.symbol,
+                                monthlyIncome = monthlyIncome.toDoubleOrNull() ?: 0.0,
+                                monthlyExpenses = monthlyExpenses.toDoubleOrNull() ?: 0.0
+                            )
+                        }
+                    },
+                    onBack = { currentStep-- },
+                    isLoading = uiState is OnboardingUiState.Loading
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun WelcomeStep(
+    name: String,
+    onNameChange: (String) -> Unit,
+    onNext: () -> Unit
+) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
         Text(
-            text = "Welcome to CoinsPot",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            text = "👋",
+            style = MaterialTheme.typography.displayLarge
         )
 
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
-            text = "Let's set up your saving profile",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Welcome to CoinsPot!",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Let's start your savings journey",
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        when (currentStep) {
-            0 -> PersonalInfoStep(uiState, viewModel)
-            1 -> FinancialInfoStep(uiState, viewModel)
-            2 -> SavingStyleStep(uiState, viewModel)
-            3 -> SummaryStep(uiState, viewModel)
+        Spacer(modifier = Modifier.height(48.dp))
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = onNameChange,
+            label = { Text("What's your name?") },
+            placeholder = { Text("Enter your name") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onNext,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = name.isNotEmpty()
+        ) {
+            Text("Next")
+        }
+    }
+}
+
+@Composable
+fun CountryStep(
+    selectedCountry: Country?,
+    onCountrySelected: (Country) -> Unit,
+    onNext: () -> Unit,
+    onBack: () -> Unit
+) {
+    val countries = remember {
+        listOf(
+            Country("United States", "USD", "$"),
+            Country("United Kingdom", "GBP", "£"),
+            Country("European Union", "EUR", "€"),
+            Country("Sri Lanka", "LKR", "Rs"),
+            Country("India", "INR", "₹"),
+            Country("Japan", "JPY", "¥"),
+            Country("Australia", "AUD", "A$"),
+            Country("Canada", "CAD", "C$")
+        )
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "🌍",
+            style = MaterialTheme.typography.displayLarge
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Select Your Country",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "This helps us set your currency",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            countries.forEach { country ->
+                CountryCard(
+                    country = country,
+                    isSelected = selectedCountry == country,
+                    onClick = { onCountrySelected(country) }
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (currentStep > 0) {
-                OutlinedButton(onClick = { currentStep-- }) {
-                    Text("Back")
-                }
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Back")
             }
 
-            if (currentStep < 3) {
-                Button(
-                    onClick = { currentStep++ },
-                    enabled = validateStep(currentStep, uiState)
-                ) {
-                    Text("Next")
-                }
-            } else {
-                Button(
-                    onClick = {
-                        viewModel.saveUserProfile()
-                        onComplete()
-                    }
-                ) {
-                    Text("Get Started")
-                }
+            Button(
+                onClick = onNext,
+                modifier = Modifier.weight(1f),
+                enabled = selectedCountry != null
+            ) {
+                Text("Next")
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PersonalInfoStep(
-    uiState: OnboardingViewModel.OnboardingUiState,
-    viewModel: OnboardingViewModel
+fun CountryCard(
+    country: Country,
+    isSelected: Boolean,
+    onClick: () -> Unit
 ) {
-    OnboardingStep(
-        title = "Personal Information",
-        description = "Tell us about yourself"
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            AppTextField(
-                value = uiState.name,
-                onValueChange = { viewModel.updateName(it) },
-                label = "Your Name"
-            )
-
-            AppTextField(
-                value = if (uiState.age == 0) "" else uiState.age.toString(),
-                onValueChange = { viewModel.updateAge(it.toIntOrNull() ?: 0) },
-                label = "Age",
-                keyboardType = KeyboardType.Number
-            )
-
-            // Country Selection Dropdown
-            var expanded by remember { mutableStateOf(false) }
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it }
-            ) {
-                OutlinedTextField(
-                    value = uiState.selectedCountry?.name ?: "Select Country",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Country") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                )
-
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    CountryData.countries.forEach { country ->
-                        DropdownMenuItem(
-                            text = { Text("${country.name} (${country.currency})") },
-                            onClick = {
-                                viewModel.updateCountry(country)
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Display selected currency
-            if (uiState.selectedCountry != null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Currency:",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "${uiState.currencySymbol} ${uiState.currency}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun FinancialInfoStep(
-    uiState: OnboardingViewModel.OnboardingUiState,
-    viewModel: OnboardingViewModel
-) {
-    OnboardingStep(
-        title = "Financial Information",
-        description = "Let's understand your finances"
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            AppTextField(
-                value = if (uiState.monthlyIncome == 0.0) "" else uiState.monthlyIncome.toString(),
-                onValueChange = { viewModel.updateIncome(it.toDoubleOrNull() ?: 0.0) },
-                label = "Monthly Income (${uiState.currencySymbol})",
-                keyboardType = KeyboardType.Decimal
-            )
-
-            AppTextField(
-                value = if (uiState.livingCosts == 0.0) "" else uiState.livingCosts.toString(),
-                onValueChange = { viewModel.updateLivingCosts(it.toDoubleOrNull() ?: 0.0) },
-                label = "Living Costs - Rent, Utilities (${uiState.currencySymbol})",
-                keyboardType = KeyboardType.Decimal
-            )
-
-            AppTextField(
-                value = if (uiState.foodExpenses == 0.0) "" else uiState.foodExpenses.toString(),
-                onValueChange = { viewModel.updateFoodExpenses(it.toDoubleOrNull() ?: 0.0) },
-                label = "Food Expenses (${uiState.currencySymbol})",
-                keyboardType = KeyboardType.Decimal
-            )
-
-            AppTextField(
-                value = if (uiState.otherCosts == 0.0) "" else uiState.otherCosts.toString(),
-                onValueChange = { viewModel.updateOtherCosts(it.toDoubleOrNull() ?: 0.0) },
-                label = "Other Monthly Costs (${uiState.currencySymbol})",
-                keyboardType = KeyboardType.Decimal
-            )
-
-            // Show disposable income
-            if (uiState.disposableIncome > 0) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Disposable Income",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "${uiState.currencySymbol} ${String.format("%.2f", uiState.disposableIncome)}",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SavingStyleStep(
-    uiState: OnboardingViewModel.OnboardingUiState,
-    viewModel: OnboardingViewModel
-) {
-    OnboardingStep(
-        title = "Saving Style",
-        description = "Choose how aggressively you want to save"
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            listOf("Conservative", "Balanced", "Aggressive").forEach { style ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (uiState.savingStyle == style.lowercase()) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        }
-                    ),
-                    onClick = { viewModel.updateSavingStyle(style.lowercase()) }
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = style,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = when (style) {
-                                "Conservative" -> "Save 5% of disposable income"
-                                "Balanced" -> "Save 10% of disposable income"
-                                "Aggressive" -> "Save 20% of disposable income"
-                                else -> ""
-                            },
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            if (uiState.recommendedDailySaving > 0) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Recommended Daily Saving",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = "${uiState.currencySymbol} ${String.format("%.2f", uiState.recommendedDailySaving)}",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SummaryStep(
-    uiState: OnboardingViewModel.OnboardingUiState,
-    viewModel: OnboardingViewModel
-) {
-    OnboardingStep(
-        title = "Summary",
-        description = "Review your saving plan"
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SummaryItem(
-                title = "Name",
-                value = uiState.name
-            )
-            SummaryItem(
-                title = "Country",
-                value = uiState.selectedCountry?.name ?: ""
-            )
-            SummaryItem(
-                title = "Currency",
-                value = "${uiState.currencySymbol} ${uiState.currency}"
-            )
-            SummaryItem(
-                title = "Disposable Income",
-                value = "${uiState.currencySymbol} ${String.format("%.2f", uiState.disposableIncome)}"
-            )
-            SummaryItem(
-                title = "Saving Style",
-                value = uiState.savingStyle.replaceFirstChar { it.uppercase() }
-            )
-            SummaryItem(
-                title = "Daily Saving Amount",
-                value = "${uiState.currencySymbol} ${String.format("%.2f", uiState.recommendedDailySaving)}"
-            )
-            SummaryItem(
-                title = "Monthly Saving",
-                value = "${uiState.currencySymbol} ${String.format("%.2f", uiState.recommendedDailySaving * 30)}"
-            )
-        }
-    }
-}
-
-@Composable
-fun SummaryItem(
-    title: String,
-    value: String
-) {
-    Row(
+    Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+        border = if (isSelected) {
+            CardDefaults.outlinedCardBorder().copy(
+                width = 2.dp,
+                brush = androidx.compose.ui.graphics.SolidColor(
+                    MaterialTheme.colorScheme.primary
+                )
+            )
+        } else {
+            CardDefaults.outlinedCardBorder()
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = country.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "${country.currency} (${country.symbol})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isSelected) {
+                Text(
+                    text = "✓",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FinancialStep(
+    monthlyIncome: String,
+    onIncomeChange: (String) -> Unit,
+    monthlyExpenses: String,
+    onExpensesChange: (String) -> Unit,
+    onComplete: () -> Unit,
+    onBack: () -> Unit,
+    isLoading: Boolean
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "💰",
+            style = MaterialTheme.typography.displayLarge
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Financial Information",
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
-    }
-}
 
-fun validateStep(step: Int, uiState: OnboardingViewModel.OnboardingUiState): Boolean {
-    return when (step) {
-        0 -> uiState.name.isNotEmpty() && uiState.age > 0 && uiState.selectedCountry != null
-        1 -> uiState.monthlyIncome > 0
-        2 -> uiState.savingStyle.isNotEmpty()
-        3 -> true
-        else -> false
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Optional: This helps us give you better insights",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        OutlinedTextField(
+            value = monthlyIncome,
+            onValueChange = {
+                if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                    onIncomeChange(it)
+                }
+            },
+            label = { Text("Monthly Income (Optional)") },
+            placeholder = { Text("0.00") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = monthlyExpenses,
+            onValueChange = {
+                if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                    onExpensesChange(it)
+                }
+            },
+            label = { Text("Monthly Expenses (Optional)") },
+            placeholder = { Text("0.00") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+                enabled = !isLoading
+            ) {
+                Text("Back")
+            }
+
+            Button(
+                onClick = onComplete,
+                modifier = Modifier.weight(1f),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Complete")
+                }
+            }
+        }
     }
 }

@@ -10,27 +10,26 @@ import javax.inject.Singleton
 class UserRepository @Inject constructor(
     private val userProfileDao: UserProfileDao
 ) {
-    suspend fun saveUserProfile(userProfile: UserProfile): Long {
-        return userProfileDao.insert(userProfile)
+
+    fun getUserProfile(): Flow<UserProfile?> = userProfileDao.getUserProfile()
+
+    suspend fun createUserProfile(profile: UserProfile) {
+        userProfileDao.insertUserProfile(profile)
     }
 
-    suspend fun updateUserProfile(userProfile: UserProfile) {
-        userProfileDao.update(userProfile)
+    suspend fun updateUserProfile(profile: UserProfile) {
+        userProfileDao.updateUserProfile(profile)
     }
 
-    suspend fun getUserProfile(): UserProfile? {
-        return userProfileDao.getUserProfile()
+    suspend fun updateMonthlyIncome(income: Double) {
+        userProfileDao.updateMonthlyIncome(income)
     }
 
-    fun getUserProfileFlow(): Flow<UserProfile?> {
-        return userProfileDao.getUserProfileFlow()
+    suspend fun updateMonthlyExpenses(expenses: Double) {
+        userProfileDao.updateMonthlyExpenses(expenses)
     }
 
-    suspend fun deleteUserProfile(userProfile: UserProfile) {
-        userProfileDao.delete(userProfile)
-    }
-
-    suspend fun clearAllData() {
-        userProfileDao.deleteAll()
+    suspend fun deleteUserProfile() {
+        userProfileDao.deleteUserProfile()
     }
 }

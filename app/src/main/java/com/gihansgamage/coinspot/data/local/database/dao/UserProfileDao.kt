@@ -6,24 +6,25 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UserProfileDao {
+
+    @Query("SELECT * FROM user_profile WHERE id = 1")
+    fun getUserProfile(): Flow<UserProfile?>
+
+    @Query("SELECT * FROM user_profile WHERE id = 1")
+    suspend fun getUserProfileSync(): UserProfile?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(userProfile: UserProfile): Long
+    suspend fun insertUserProfile(profile: UserProfile)
 
     @Update
-    suspend fun update(userProfile: UserProfile)
+    suspend fun updateUserProfile(profile: UserProfile)
 
-    @Delete
-    suspend fun delete(userProfile: UserProfile)
+    @Query("UPDATE user_profile SET monthlyIncome = :income, updatedAt = :timestamp WHERE id = 1")
+    suspend fun updateMonthlyIncome(income: Double, timestamp: Long = System.currentTimeMillis())
 
-    @Query("SELECT * FROM user_profile WHERE id = :userId")
-    suspend fun getUserProfileById(userId: Int): UserProfile?
-
-    @Query("SELECT * FROM user_profile LIMIT 1")
-    suspend fun getUserProfile(): UserProfile?
-
-    @Query("SELECT * FROM user_profile LIMIT 1")
-    fun getUserProfileFlow(): Flow<UserProfile?>
+    @Query("UPDATE user_profile SET monthlyExpenses = :expenses, updatedAt = :timestamp WHERE id = 1")
+    suspend fun updateMonthlyExpenses(expenses: Double, timestamp: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM user_profile")
-    suspend fun deleteAll()
+    suspend fun deleteUserProfile()
 }
